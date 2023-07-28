@@ -171,6 +171,7 @@ set(7.in_practice
     1.debugging
     2.text_rendering
     #3.2d_game
+    4.compute_shader
 )
 
 set(GUEST_ARTICLES
@@ -245,6 +246,7 @@ function(create_project_from_sources chapter demo)
              "src/${chapter}/${demo}/*.tes"
              "src/${chapter}/${demo}/*.gs"
              "src/${chapter}/${demo}/*.cs"
+             "src/${chapter}/${demo}/*.comp"
     )
 	# copy dlls
 	file(GLOB DLLS "dlls/*.dll")

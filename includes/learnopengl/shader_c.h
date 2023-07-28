@@ -3,11 +3,20 @@
 
 #include <glad/glad.h>
 #include <glm/glm.hpp>
+#include <GL/glx.h>
+#include <GL/glxext.h>
 
 #include <string>
 #include <fstream>
 #include <sstream>
 #include <iostream>
+
+typedef void (APIENTRYP PFNGLSPECIALIZESHADERPROC) (GLuint shader, const GLchar *pEntryPoint, GLuint numSpecializationConstants, const GLuint *pConstantIndex, const GLuint *pConstantValue);
+// typedef void (GLAPIENTRY * PFNGLSPECIALIZESHADERPROC) (GLuint shader, const GLchar *pEntryPoint, GLuint numSpecializationConstants, const GLuint *pConstantIndex, const GLuint *pConstantValue);
+// typedef void (APIENTRYP PFNGLSPECIALIZESHADERPROC) (GLuint shader, const GLchar *pEntryPoint, GLuint numSpecializationConstants, const GLuint *pConstantIndex, const GLuint *pConstantValue);
+
+static PFNGLSPECIALIZESHADERPROC gl_specialize_shader;
+#define GL_SHADER_BINARY_FORMAT_SPIR_V_ARB 0x9551
 
 class ComputeShader
 {
@@ -44,8 +53,22 @@ public:
         unsigned int compute;
         // compute shader
         compute = glCreateShader(GL_COMPUTE_SHADER);
-        glShaderSource(compute, 1, &cShaderCode, NULL);
-        glCompileShader(compute);
+        if (std::string(computePath).find(".spv") != std::string::npos) {
+            std::cout << "Compiling binary spv shader" << std::endl;
+            gl_specialize_shader = (PFNGLSPECIALIZESHADERPROC)glXGetProcAddress((unsigned char*)"glSpecializeShaderARB");
+            if(!gl_specialize_shader) {
+                std::cout << "failed to load glSpecializeShaderARB entry point" << std::endl;
+                return;
+            }
+            glShaderBinary(1, &compute, GL_SHADER_BINARY_FORMAT_SPIR_V_ARB, computeCode.data(), computeCode.size());
+	        gl_specialize_shader(compute, "main", 0, 0, 0);
+	        // glSpecializeShader(compute, "main", 0, 0, 0);
+        }
+        else {
+            std::cout << "Compiling compute shader" << std::endl;
+            glShaderSource(compute, 1, &cShaderCode, NULL);
+            glCompileShader(compute);
+        }
         checkCompileErrors(compute, "COMPUTE");
         
         // shader Program

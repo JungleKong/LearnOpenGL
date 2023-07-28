@@ -76,6 +76,35 @@ int main()
     // build and compile our shader zprogram
     // ------------------------------------
     Shader ourShader("7.4.camera.vs", "7.4.camera.fs");
+    Shader billboardShader("billboard.vs", "billboard.fs");
+
+        // The VBO containing the 4 vertices of the particles.
+	static const GLfloat g_vertex_buffer_data[] = { 
+		 -0.5f,  0.5f, 0.0f,
+		  0.5f,  0.5f, 0.0f,
+		 -0.5f,  0.7f, 0.0f,
+		  0.5f,  0.7f, 0.0f,          
+	};
+	GLuint billboard_vertex_buffer;
+    GLuint VertexArrayID;
+	glGenVertexArrays(1, &VertexArrayID);
+	glGenBuffers(1, &billboard_vertex_buffer);
+	glBindVertexArray(VertexArrayID);
+	glBindBuffer(GL_ARRAY_BUFFER, billboard_vertex_buffer);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_DYNAMIC_DRAW);
+    
+    glBindBuffer(GL_ARRAY_BUFFER, billboard_vertex_buffer);
+    glVertexAttribPointer(
+        0,                  // attribute. No particular reason for 0, but must match the layout in the shader.
+        3,                  // size
+        GL_FLOAT,           // type
+        GL_FALSE,           // normalized?
+        0,                  // stride
+        (void*)0            // array buffer offset
+    );
+	glEnableVertexAttribArray(0);	
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
 
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
@@ -259,6 +288,36 @@ int main()
 
             glDrawArrays(GL_TRIANGLES, 0, 36);
         }
+        // glDisableVertexAttribArray(0);
+		// glDisableVertexAttribArray(1);
+
+        billboardShader.use();
+        glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+        model = glm::translate(model, glm::vec3(0.0f, 1.0f, 0.0f));
+        // float angle = 20.0f;
+        // model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
+
+		glm::vec3 CameraPosition(glm::inverse(view)[3]);
+
+		glm::mat4 ViewProjectionMatrix = projection * view;
+        glm::mat4 MVP = projection * view * model;
+
+        // This is the only interesting part of the tutorial.
+		// This is equivalent to mlutiplying (1,0,0) and (0,1,0) by inverse(ViewMatrix).
+		// ViewMatrix is orthogonal (it was made this way), 
+		// so its inverse is also its transpose, 
+		// and transposing a matrix is "free" (inversing is slooow)
+		billboardShader.setVec3("CameraRight_worldspace", view[0][0], view[1][0], view[2][0]);
+		billboardShader.setVec3("CameraUp_worldspace"   , view[0][1], view[1][1], view[2][1]);
+		
+		billboardShader.setVec3("BillboardPos", 0.0f, 1.0f, -1.0f); // The billboard will be just above the cube
+		billboardShader.setVec2("BillboardSize", 10.0f, 10.125f);  // and 1m*12cm, because it matches its 256*32 resolution =)
+        billboardShader.setMat4("VP", ViewProjectionMatrix);
+        billboardShader.setMat4("MVP", MVP);
+
+        glEnable(GL_BLEND);
+        glBindVertexArray(VertexArrayID);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
@@ -270,6 +329,8 @@ int main()
     // ------------------------------------------------------------------------
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
+    glDeleteVertexArrays(1, &VertexArrayID);
+    glDeleteBuffers(1, &billboard_vertex_buffer);
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------
