@@ -172,6 +172,7 @@ set(7.in_practice
     2.text_rendering
     #3.2d_game
     4.compute_shader
+    5.music_effect
 )
 
 set(GUEST_ARTICLES
