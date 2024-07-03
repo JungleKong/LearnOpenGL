@@ -26,7 +26,7 @@ vec3 rgb2hsv(vec3 c) {
 void main()
 {
     vec4 color = texture(feedbackTexture, TexCoord);
-    float grey = color.r * 0.299 + color.g * 0.587 + color.g * 0.114;
+    float grey = color.r * 0.299 + color.g * 0.587 + color.b * 0.114;
     // float grey = rgb2hsv(color.rgb).z;
 
     float brightnessGrey = clamp(grey + (brightness - 1.0), 0.0, 1.0);
