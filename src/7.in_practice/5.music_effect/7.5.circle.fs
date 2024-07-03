@@ -91,6 +91,6 @@ void main() {
     // vec3 color = hsv2rgb(vec3(hue, sat, value));
     // gl_FragColor = vec4(min(weight * alpha, color.r), min(weight * alpha, color.g), min(weight * alpha, color.b), weight * alpha); // 使用alpha通道控制透明度
 
-    gl_FragColor = vec4(smoothstep(radius, radius - 0.00001, dist));
+    gl_FragColor = vec4(step(dist, radius));
 
 }
