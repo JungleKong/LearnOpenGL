@@ -11,8 +11,8 @@ const float width = 800.0;
 const float height = 800.0;
 const float centerX = 0.5;  // 缩放的中心点
 const float centerY = 0.5;  // 缩放的中心点
-const float alphaBack = 0.982;
-const float scaleBack = 1.003;
+const float alphaBack = 0.995;
+const float scaleBack = 1.03;
 
 void main()
 {

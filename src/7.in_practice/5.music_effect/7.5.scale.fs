@@ -4,8 +4,7 @@ out vec4 FragColor;
 in vec3 ourColor;
 in vec2 TexCoord;
 
-uniform sampler2D feedbackTexture;
-uniform sampler2D circleMappingTexture;
+uniform sampler2D scaleInTexture;
 
 const float border = 0.8;
 const float width = 800.0;
@@ -17,10 +16,9 @@ const float scaleBack = 1.003;
 
 void main()
 {
-    vec4 input1 = texture(feedbackTexture, TexCoord);
-    vec4 input2 = texture(circleMappingTexture, TexCoord);
-
-    vec4 overColor = input2 * (1.0 - input1.a) + input1;
-
-    gl_FragColor = overColor;
+    vec2 normCoord = (2.0 * TexCoord - 1.0);
+    vec2 uvBack = (vec2(normCoord.x, normCoord.y * height / width) / scaleBack + 1.0) / 2.0;
+    
+    gl_FragColor = texture(scaleInTexture, uvBack);
+    // gl_FragColor = vec4(transparentColor.rgb, transparentColor.a * alphaBack);
 } 

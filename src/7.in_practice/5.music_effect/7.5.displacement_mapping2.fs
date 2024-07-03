@@ -9,7 +9,8 @@ uniform sampler2D circleTexture;
 
 uniform float time;
 
-const float border = 0.3;
+const vec2 midpoint = vec2(0.5, 0.5);
+const vec2 displaceWeight = vec2(1.0, 1.0);
 const float width = 800.0;
 const float height = 800.0;
 
@@ -59,15 +60,10 @@ vec3 getColor(float radius) {
 
 void main()
 {
-    float displacement = texture(noiseTexture, TexCoord).r;
-    displacement = displacement - border;
-    vec2 disCoord = TexCoord + vec2(displacement / 1.5);
-
-    // if (disCoord.x < 0.0 || disCoord.x > 1.0 || disCoord.y < 0.0 || disCoord.y > 1.0) {
-    //     discard;
-    // }
+    vec2 displacement = texture(noiseTexture, TexCoord).rg;
+    displacement -= midpoint;
+    vec2 disCoord = TexCoord + displacement * displaceWeight * 2.0;
     disCoord = clampCoord(disCoord);
-
     vec3 col = texture(circleTexture, disCoord).rgb;
 
     // difference
@@ -77,12 +73,12 @@ void main()
     float grey = differenceColor.r * 0.299 + differenceColor.g * 0.587 + differenceColor.g * 0.114;
 
     // mask
-    // float blackLevel = clamp(grey, 0.4, 1.0);
-    float blackLevel = clamp((grey - 0.0), 0.0, 1.0);
+    // float blackLevel = clamp(grey, 0.16, 1.0);
+    float blackLevel = grey * step(0.16, grey);
     float gammaGrey = pow(blackLevel, 0.83);
 
 
-    float radius = getRadius(vec2(grey, 0.0));
+    float radius = getRadius(vec2(grey / 2.0, 0.0));
     vec3 rampCol = getColor(radius);
 
     vec3 outColor;
@@ -93,6 +89,8 @@ void main()
     } else {
         outColor = 1.0 - 2.0 * (1.0 - gammaGrey) * (1.0 - rampCol);
     }
+
+    // gl_FragColor = vec4(getColor(getRadius(TexCoord)), 1.0);
 
     // noise color
     // gl_FragColor = vec4(texture(noiseTexture, TexCoord).rgb, 1.0);
@@ -108,6 +106,10 @@ void main()
 
     // overlay
     // gl_FragColor = vec4(vec3(gammaGrey), 1.0);
+
+
+    // rampCol
+    // gl_FragColor = vec4(vec3(rampCol), 1.0);
 
     // final out color
     gl_FragColor = vec4(outColor, 1.0);

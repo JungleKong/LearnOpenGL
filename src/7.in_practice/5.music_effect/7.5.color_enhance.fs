@@ -4,13 +4,12 @@ out vec4 FragColor;
 in vec3 ourColor;
 in vec2 TexCoord;
 
-
-
 uniform sampler2D feedbackTexture;
 
 const float width = 800.0;
 const float height = 800.0;
 
+const float brightness = 1.0;
 const float gamma = 1.74;
 const float contrast = 1.69;
 
@@ -27,11 +26,13 @@ vec3 rgb2hsv(vec3 c) {
 void main()
 {
     vec4 color = texture(feedbackTexture, TexCoord);
-    float grey = 0.5 * (color.r * 0.299 + color.g * 0.587 + color.g * 0.114) + color.a * 0.5;
+    float grey = color.r * 0.299 + color.g * 0.587 + color.g * 0.114;
     // float grey = rgb2hsv(color.rgb).z;
 
-    float gammaGrey = pow(grey, 0.74);
-    float contrastGrey = 1.0 / (1.0 + exp(-(gammaGrey - 0.5) * 2.0 * contrast));
+    float brightnessGrey = clamp(grey + (brightness - 1.0), 0.0, 1.0);
+    float gammaGrey = pow(brightnessGrey, 0.74);
+    // float contrastGrey = clamp(1.0 / (1.0 + exp(-(gammaGrey - 0.5) * 2.0 * contrast * 2.0)), 0.0, 1.0);
+    float contrastGrey = clamp(gammaGrey + (gammaGrey - 0.5) * contrast, 0.0, 1.0);
 
     gl_FragColor = vec4(vec3(contrastGrey), 1.0);
     // gl_FragColor = vec4(texture(feedbackTexture, TexCoord).rgb, 1.0);

@@ -11,7 +11,7 @@ uniform float hue;
 uniform float time;
 
 const int State = 0;
-const float blur = 0.15;  // 圆环边缘的模糊半径
+const float blur = 0.18;  // 圆环边缘的模糊半径
 const float ringWidth = 0.0001;  // 圆环的宽度
 const float width = 800.0;
 const float height = 800.0;
@@ -77,17 +77,20 @@ void main() {
     float innerRadius = radius; // 圆环的内半径
     float outerRadius = radius + ringWidth; // 圆环的外半径
 
-    float center_x = 0.5 + PerlinSum(vec2(0.0, int(time * 10.0) % int(width) / 800.0)) * 0.5;
-    float center_y = 0.5 + PerlinSum(vec2(0.5, int(time * 10.0) % int(width) / 800.0)) * 0.5;
+    float center_x = 0.5 + PerlinSum(vec2(sin(time / 30.0) * 0.5 + 0.5, int(time * 10.0) % int(width) / 800.0)) * 0.5;
+    float center_y = 0.5 + PerlinSum(vec2(cos(time / 30.0) * 0.5 + 0.5, int(time * 10.0) % int(width) / 800.0)) * 0.5;
 
     // 计算片段到圆心的距离
     float dist = length(vec2(TexCoord.x, (TexCoord.y - 0.5) * height / width + 0.5) - vec2(center_x, center_y)); // 假设圆心在纹理的中心
 
-    // 利用smoothstep产生圆环的模糊边缘
-    float alpha = smoothstep(innerRadius - blur, innerRadius, dist) *
-                 (1.0 - smoothstep(outerRadius, outerRadius + blur, dist));
+    // // 利用smoothstep产生圆环的模糊边缘
+    // float alpha = smoothstep(innerRadius - blur, innerRadius, dist) *
+    //              (1.0 - smoothstep(outerRadius, outerRadius + blur, dist));
 
-    float weight = 0.2;
-    vec3 color = hsv2rgb(vec3(hue, sat, value));
-    gl_FragColor = vec4(min(weight * alpha, color.r), min(weight * alpha, color.g), min(weight * alpha, color.b), weight * alpha); // 使用alpha通道控制透明度
+    // float weight = 4.0 / 11.1;
+    // vec3 color = hsv2rgb(vec3(hue, sat, value));
+    // gl_FragColor = vec4(min(weight * alpha, color.r), min(weight * alpha, color.g), min(weight * alpha, color.b), weight * alpha); // 使用alpha通道控制透明度
+
+    gl_FragColor = vec4(smoothstep(radius, radius - 0.00001, dist));
+
 }

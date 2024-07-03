@@ -4,25 +4,28 @@ out vec4 FragColor;
 in vec3 ourColor;
 in vec2 TexCoord;
 
-uniform sampler2D noiseTexture;
-uniform sampler2D circleTexture;
+uniform sampler2D displaceTexture;
+uniform sampler2D sourceTexture;
 
-const float border = 0.5;
 const float width = 800.0;
 const float height = 800.0;
 
+const vec2 midpoint = vec2(0.5, 0.5);
+const vec2 displaceWeight = vec2(0.026, 0.026);
+
+// 边界值处理 const char* extend = "hold"
+vec2 edgeCoord(vec2 coord) {
+    return vec2(clamp(coord.x, 0.0, 1.0), clamp(coord.y, 0.0, 1.0));
+}
+
 void main()
 {
-    float displacement = texture(noiseTexture, TexCoord).r;
-    displacement = displacement - border;
-    vec2 disCoord = TexCoord + vec2(displacement / 30.0);
+    vec2 displacement = texture(displaceTexture, TexCoord).rg;
+    displacement -= midpoint;
+    displacement *= displaceWeight * 5.0;
+    vec2 disCoord = TexCoord + displacement;
 
-    // if (disCoord.x < 0.0 || disCoord.x > 1.0 || disCoord.y < 0.0 || disCoord.y > 1.0) {
-    //     discard;
-    // }
+    disCoord = edgeCoord(disCoord);
 
-    vec4 col = texture(circleTexture, disCoord).rgba;
-
-    FragColor = vec4(col);
-    // FragColor = vec4(texture(circleTexture, TexCoord).rgb, 1.0);
+    FragColor = texture(sourceTexture, disCoord);
 } 

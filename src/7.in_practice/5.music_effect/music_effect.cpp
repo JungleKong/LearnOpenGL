@@ -624,6 +624,30 @@ const float translateY[] = {
 0.05873774,
 };
 
+// 函数来检查和打印任何OpenGL错误
+void CheckGLError(const char* fname, int line)
+{
+    GLenum err = glGetError();
+    while (err != GL_NO_ERROR) {
+        std::string error;
+        switch (err) {
+            case GL_INVALID_OPERATION:              error = "INVALID_OPERATION";      break;
+            case GL_INVALID_ENUM:                   error = "INVALID_ENUM";           break;
+            case GL_INVALID_VALUE:                  error = "INVALID_VALUE";          break;
+            case GL_OUT_OF_MEMORY:                  error = "OUT_OF_MEMORY";          break;
+            case GL_INVALID_FRAMEBUFFER_OPERATION:  error = "INVALID_FRAMEBUFFER_OPERATION";  break;
+        }
+        std::cerr << "[OpenGL Error] (" << error << "): "
+                  << fname << " (" << line << ")" << std::endl;
+        err = glGetError();
+    }
+}
+
+// 宏定义来使用上面的函数
+#define GL_CHECK() do { \
+        CheckGLError(__FILE__, __LINE__); \
+    } while (0)
+
 int main()
 {
     // glfw: initialize and configure
@@ -658,15 +682,19 @@ int main()
 
     // build and compile our shader zprogram
     // ------------------------------------
-    Shader noiseShader("../../src/7.in_practice/5.music_effect/7.5.noise.vs", "../../src/7.in_practice/5.music_effect/7.5.noise.fs"); 
     Shader circleShader("../../src/7.in_practice/5.music_effect/7.5.circle.vs", "../../src/7.in_practice/5.music_effect/7.5.circle.fs");
+    Shader edgeShader("../../src/7.in_practice/5.music_effect/7.5.edge.vs", "../../src/7.in_practice/5.music_effect/7.5.edge.fs");
+    Shader noiseShader("../../src/7.in_practice/5.music_effect/7.5.noise.vs", "../../src/7.in_practice/5.music_effect/7.5.noise.fs"); 
     Shader diplacementMappingShader("../../src/7.in_practice/5.music_effect/7.5.displacement_mapping.vs", "../../src/7.in_practice/5.music_effect/7.5.displacement_mapping.fs");
     Shader feedbackShader("../../src/7.in_practice/5.music_effect/7.5.feedback.vs", "../../src/7.in_practice/5.music_effect/7.5.feedback.fs");
     Shader blurShader("../../src/7.in_practice/5.music_effect/7.5.blur.vs", "../../src/7.in_practice/5.music_effect/7.5.blur.fs");
+    Shader blurHShader("../../src/7.in_practice/5.music_effect/7.5.blurH.vs", "../../src/7.in_practice/5.music_effect/7.5.blurH.fs");
+    Shader blurVShader("../../src/7.in_practice/5.music_effect/7.5.blurV.vs", "../../src/7.in_practice/5.music_effect/7.5.blurV.fs");
     Shader colorEnhanceShader("../../src/7.in_practice/5.music_effect/7.5.color_enhance.vs", "../../src/7.in_practice/5.music_effect/7.5.color_enhance.fs");
     Shader diplacementMappingShader2("../../src/7.in_practice/5.music_effect/7.5.displacement_mapping2.vs", "../../src/7.in_practice/5.music_effect/7.5.displacement_mapping2.fs");
     Shader screenShader("../../src/7.in_practice/5.music_effect/7.5.screen.vs", "../../src/7.in_practice/5.music_effect/7.5.screen.fs"); 
     Shader transparentShader("../../src/7.in_practice/5.music_effect/7.5.transparent.vs", "../../src/7.in_practice/5.music_effect/7.5.transparent.fs"); 
+    Shader scaleShader("../../src/7.in_practice/5.music_effect/7.5.scale.vs", "../../src/7.in_practice/5.music_effect/7.5.scale.fs"); 
 
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
@@ -802,6 +830,30 @@ int main()
         std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+    // edge framebuffer configuration
+    // -------------------------
+    unsigned int edgebuffer;
+    glGenFramebuffers(1, &edgebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, edgebuffer);
+    // create a color attachment texture
+    unsigned int edgeTexture;
+    glGenTextures(1, &edgeTexture);
+    glBindTexture(GL_TEXTURE_2D, edgeTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, edgeTexture, 0);
+    // create a renderbuffer object for depth and stencil attachment (we won't be sampling these)
+    unsigned int rboEdge;
+    glGenRenderbuffers(1, &rboEdge);
+    glBindRenderbuffer(GL_RENDERBUFFER, rboEdge);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT); // use a single renderbuffer object for both a depth AND stencil buffer.
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rboEdge); // now actually attach it
+    // now that we actually created the framebuffer and added all attachments we want to check if it is actually complete now
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
     // displacement mapping framebuffer configuration
     // -------------------------
     unsigned int displacementbuffer;
@@ -835,7 +887,7 @@ int main()
     unsigned int displacementTexture2;
     glGenTextures(1, &displacementTexture2);
     glBindTexture(GL_TEXTURE_2D, displacementTexture2);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, displacementTexture2, 0);
@@ -859,9 +911,9 @@ int main()
     unsigned int feedbackTexture;
     glGenTextures(1, &feedbackTexture);
     glBindTexture(GL_TEXTURE_2D, feedbackTexture);
-    void* emptyData = malloc(SCR_WIDTH * SCR_HEIGHT * sizeof(char) * 4);
-    memset(emptyData, 1, SCR_WIDTH * SCR_HEIGHT * sizeof(char) * 4);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, emptyData);
+    void* emptyData = malloc(SCR_WIDTH * SCR_HEIGHT * sizeof(float) * 4);
+    memset(emptyData, 1, SCR_WIDTH * SCR_HEIGHT * sizeof(float) * 4);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_FLOAT, emptyData);
     // glGenerateMipmap(GL_TEXTURE_2D);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -871,7 +923,7 @@ int main()
     unsigned int feedbackTextureBack;
     glGenTextures(1, &feedbackTextureBack);
     glBindTexture(GL_TEXTURE_2D, feedbackTextureBack);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, emptyData);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_FLOAT, emptyData);
     // glGenerateMipmap(GL_TEXTURE_2D);
     free(emptyData);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -891,7 +943,6 @@ int main()
 
     // blur framebuffer configuration
     // -------------------------
-    int preShrink = 1.0;
     unsigned int blurBuffer;
     glGenFramebuffers(1, &blurBuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, blurBuffer);
@@ -899,7 +950,7 @@ int main()
     unsigned int blurTexture;
     glGenTextures(1, &blurTexture);
     glBindTexture(GL_TEXTURE_2D, blurTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, blurTexture, 0);
@@ -916,6 +967,58 @@ int main()
 
     // blur framebuffer configuration
     // -------------------------
+    int preShrink = 8;
+    unsigned int blurHBuffer;
+    glGenFramebuffers(1, &blurHBuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, blurHBuffer);
+    // create a color attachment texture
+    unsigned int blurHTexture;
+    glGenTextures(1, &blurHTexture);
+    glBindTexture(GL_TEXTURE_2D, blurHTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCR_WIDTH / preShrink, SCR_HEIGHT / preShrink, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, blurHTexture, 0);
+    // create a renderbuffer object for depth and stencil attachment (we won't be sampling these)
+    unsigned int rboBlurH;
+    glGenRenderbuffers(1, &rboBlurH);
+    glBindRenderbuffer(GL_RENDERBUFFER, rboBlurH);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH / preShrink, SCR_HEIGHT / preShrink); // use a single renderbuffer object for both a depth AND stencil buffer.
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rboBlurH); // now actually attach it
+    // now that we actually created the framebuffer and added all attachments we want to check if it is actually complete now
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    GL_CHECK();
+
+
+    // blur framebuffer configuration
+    // -------------------------
+    unsigned int blurVBuffer;
+    glGenFramebuffers(1, &blurVBuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, blurVBuffer);
+    // create a color attachment texture
+    unsigned int blurVTexture;
+    glGenTextures(1, &blurVTexture);
+    glBindTexture(GL_TEXTURE_2D, blurVTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCR_WIDTH / preShrink, SCR_HEIGHT / preShrink, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, blurVTexture, 0);
+    // create a renderbuffer object for depth and stencil attachment (we won't be sampling these)
+    unsigned int rboBlurV;
+    glGenRenderbuffers(1, &rboBlurV);
+    glBindRenderbuffer(GL_RENDERBUFFER, rboBlurV);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH / preShrink, SCR_HEIGHT / preShrink); // use a single renderbuffer object for both a depth AND stencil buffer.
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rboBlurV); // now actually attach it
+    // now that we actually created the framebuffer and added all attachments we want to check if it is actually complete now
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    GL_CHECK();
+
+    // transparent framebuffer configuration
+    // -------------------------
     unsigned int transparentBuffer;
     glGenFramebuffers(1, &transparentBuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, transparentBuffer);
@@ -923,7 +1026,7 @@ int main()
     unsigned int transparentTexture;
     glGenTextures(1, &transparentTexture);
     glBindTexture(GL_TEXTURE_2D, transparentTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, transparentTexture, 0);
@@ -938,6 +1041,30 @@ int main()
         std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+        // transparent framebuffer configuration
+    // -------------------------
+    unsigned int scaleBuffer;
+    glGenFramebuffers(1, &scaleBuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, scaleBuffer);
+    // create a color attachment texture
+    unsigned int scaleTexture;
+    glGenTextures(1, &scaleTexture);
+    glBindTexture(GL_TEXTURE_2D, scaleTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, scaleTexture, 0);
+    // create a renderbuffer object for depth and stencil attachment (we won't be sampling these)
+    unsigned int rboScale;
+    glGenRenderbuffers(1, &rboScale);
+    glBindRenderbuffer(GL_RENDERBUFFER, rboScale);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT); // use a single renderbuffer object for both a depth AND stencil buffer.
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rboScale); // now actually attach it
+    // now that we actually created the framebuffer and added all attachments we want to check if it is actually complete now
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
     // color enhance framebuffer configuration
     // -------------------------
     unsigned int colorEnhanceBuffer;
@@ -947,7 +1074,7 @@ int main()
     unsigned int colorEnhanceTexture;
     glGenTextures(1, &colorEnhanceTexture);
     glBindTexture(GL_TEXTURE_2D, colorEnhanceTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorEnhanceTexture, 0);
@@ -1043,6 +1170,35 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
         // render circle end ----------------------------------------------------------------------------------------------
 
+        // render circle begin --------------------------------------------------------------------------------------------
+        // bind to framebuffer and draw scene as we normally would to color texture 
+        glBindFramebuffer(GL_FRAMEBUFFER, edgebuffer);
+        glEnable(GL_DEPTH_TEST); // enable depth testing (is disabled for rendering screen-space quad)
+
+        // make sure we clear the framebuffer's content
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // render container
+        edgeShader.use();
+        {
+
+        }
+
+        glBindVertexArray(VAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, circleTexture);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+
+        // now bind back to default framebuffer and draw a quad plane with the attached framebuffer color texture
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
+        // clear all relevant buffers
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // set clear color to white (not really necessary actually, since we won't be able to see behind the quad anyways)
+        glClear(GL_COLOR_BUFFER_BIT);
+        // render circle end ----------------------------------------------------------------------------------------------
+
         // render displacement mapping begin --------------------------------------------------------------------------------------------
         // bind to framebuffer and draw scene as we normally would to color texture 
         glBindFramebuffer(GL_FRAMEBUFFER, displacementbuffer);
@@ -1055,14 +1211,14 @@ int main()
         // render container
         diplacementMappingShader.use();
         {
-            diplacementMappingShader.setInt("noiseTexture", 0);
-            diplacementMappingShader.setInt("circleTexture", 1);
+            diplacementMappingShader.setInt("displaceTexture", 0);
+            diplacementMappingShader.setInt("sourceTexture", 1);
         }
         glBindVertexArray(VAO);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, simplex2DNoiseTexture);
         glActiveTexture(GL_TEXTURE0 + 1);
-        glBindTexture(GL_TEXTURE_2D, circleTexture);
+        glBindTexture(GL_TEXTURE_2D, edgeTexture);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
@@ -1074,6 +1230,98 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
         // render displacement mapping end ----------------------------------------------------------------------------------------------
 
+
+        // render blurH begin --------------------------------------------------------------------------------------------
+        // bind to framebuffer and draw scene as we normally would to color texture 
+        glViewport(0, 0, SCR_WIDTH / preShrink, SCR_HEIGHT / preShrink);
+        glBindFramebuffer(GL_FRAMEBUFFER, blurHBuffer);
+        glEnable(GL_DEPTH_TEST); // enable depth testing (is disabled for rendering screen-space quad)
+
+        // make sure we clear the framebuffer's content
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // render container
+        blurHShader.use();
+        {
+            blurHShader.setInt("inTexture", 0);
+        }
+        glBindVertexArray(VAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, displacementTexture);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+
+        // now bind back to default framebuffer and draw a quad plane with the attached framebuffer color texture
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
+        // clear all relevant buffers
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // set clear color to white (not really necessary actually, since we won't be able to see behind the quad anyways)
+        glClear(GL_COLOR_BUFFER_BIT);
+        GL_CHECK();
+        // render blur end ----------------------------------------------------------------------------------------------
+
+        // render blur begin --------------------------------------------------------------------------------------------
+        // bind to framebuffer and draw scene as we normally would to color texture 
+        glBindFramebuffer(GL_FRAMEBUFFER, blurVBuffer);
+        glEnable(GL_DEPTH_TEST); // enable depth testing (is disabled for rendering screen-space quad)
+
+        // make sure we clear the framebuffer's content
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // render container
+        blurVShader.use();
+        {
+            blurVShader.setInt("inTexture", 0);
+            blurVShader.setFloat("hue", sin(time));
+        }
+        glBindVertexArray(VAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, blurHTexture);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+
+        // now bind back to default framebuffer and draw a quad plane with the attached framebuffer color texture
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
+        // clear all relevant buffers
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // set clear color to white (not really necessary actually, since we won't be able to see behind the quad anyways)
+        glClear(GL_COLOR_BUFFER_BIT);
+        GL_CHECK();
+        // render blur end ----------------------------------------------------------------------------------------------
+
+
+
+        // // render blur begin --------------------------------------------------------------------------------------------
+        // // bind to framebuffer and draw scene as we normally would to color texture 
+        // glBindFramebuffer(GL_FRAMEBUFFER, blurBuffer);
+        // glEnable(GL_DEPTH_TEST); // enable depth testing (is disabled for rendering screen-space quad)
+
+        // // make sure we clear the framebuffer's content
+        // glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // // render container
+        // blurShader.use();
+        // {
+        //     blurShader.setInt("inTexture", 0);
+        // }
+        // glBindVertexArray(VAO);
+        // glActiveTexture(GL_TEXTURE0);
+        // glBindTexture(GL_TEXTURE_2D, displacementTexture);
+        // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        // glBindVertexArray(0);
+
+        // // now bind back to default framebuffer and draw a quad plane with the attached framebuffer color texture
+        // glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        // glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
+        // // clear all relevant buffers
+        // glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // set clear color to white (not really necessary actually, since we won't be able to see behind the quad anyways)
+        // glClear(GL_COLOR_BUFFER_BIT);
+        // // render blur end ----------------------------------------------------------------------------------------------
+
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 
         // render transparent begin --------------------------------------------------------------------------------------------
         // bind to framebuffer and draw scene as we normally would to color texture 
@@ -1092,7 +1340,7 @@ int main()
         glBindVertexArray(VAO);
         glActiveTexture(GL_TEXTURE0);
         if (frame == 0) {
-            glBindTexture(GL_TEXTURE_2D, displacementTexture);
+            glBindTexture(GL_TEXTURE_2D, blurVTexture);
         } else {
             glBindTexture(GL_TEXTURE_2D, feedbackTexture);
         }
@@ -1107,14 +1355,38 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
         // render transparent end ----------------------------------------------------------------------------------------------
 
+
+        // render scale begin --------------------------------------------------------------------------------------------
+        // bind to framebuffer and draw scene as we normally would to color texture 
+        glBindFramebuffer(GL_FRAMEBUFFER, scaleBuffer);
+        glEnable(GL_DEPTH_TEST); // enable depth testing (is disabled for rendering screen-space quad)
+
+        // make sure we clear the framebuffer's content
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // render container
+        scaleShader.use();
+        {
+            scaleShader.setInt("scaleInTexture", 0);
+        }
+        glBindVertexArray(VAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, transparentTexture);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+
+        // now bind back to default framebuffer and draw a quad plane with the attached framebuffer color texture
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
+        // clear all relevant buffers
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // set clear color to white (not really necessary actually, since we won't be able to see behind the quad anyways)
+        glClear(GL_COLOR_BUFFER_BIT);
+        // render scale end ----------------------------------------------------------------------------------------------
+
         // render feedback begin --------------------------------------------------------------------------------------------
         // bind to framebuffer and draw scene as we normally would to color texture 
         glBindFramebuffer(GL_FRAMEBUFFER, feedbackbuffer);
-        // if (frame % 2 == 0) {
-        //     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, feedbackTexture, 0);
-        // } else {
-        //     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, feedbackTextureBack, 0);
-        // }
         glEnable(GL_DEPTH_TEST); // enable depth testing (is disabled for rendering screen-space quad)
 
         // make sure we clear the framebuffer's content
@@ -1128,17 +1400,10 @@ int main()
             feedbackShader.setInt("circleMappingTexture", 1);
         }
         glBindVertexArray(VAO);
-        // if (frame % 2 == 0) {
-        //     glActiveTexture(GL_TEXTURE0);
-        //     glBindTexture(GL_TEXTURE_2D, feedbackTextureBack);
-        // } else {
-        //     glActiveTexture(GL_TEXTURE0);
-        //     glBindTexture(GL_TEXTURE_2D, feedbackTexture);
-        // }
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, transparentTexture);
+        glBindTexture(GL_TEXTURE_2D, scaleTexture);
         glActiveTexture(GL_TEXTURE0 + 1);
-        glBindTexture(GL_TEXTURE_2D, displacementTexture);
+        glBindTexture(GL_TEXTURE_2D, blurVTexture);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
@@ -1149,38 +1414,6 @@ int main()
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // set clear color to white (not really necessary actually, since we won't be able to see behind the quad anyways)
         glClear(GL_COLOR_BUFFER_BIT);
         // render feedback end ----------------------------------------------------------------------------------------------
-
-        // // render blur begin --------------------------------------------------------------------------------------------
-        // // bind to framebuffer and draw scene as we normally would to color texture 
-        // glBindFramebuffer(GL_FRAMEBUFFER, blurBuffer);
-        // glEnable(GL_DEPTH_TEST); // enable depth testing (is disabled for rendering screen-space quad)
-
-        // // make sure we clear the framebuffer's content
-        // glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        // // render container
-        // blurShader.use();
-        // {
-        //     blurShader.setInt("inTexture", 0);
-        // }
-        // glBindVertexArray(VAO);
-        // glActiveTexture(GL_TEXTURE0);
-        // if (frame % 2 == 0) {
-        //     glBindTexture(GL_TEXTURE_2D, feedbackTexture);
-        // } else {
-        //     glBindTexture(GL_TEXTURE_2D, feedbackTextureBack);
-        // }
-        // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        // glBindVertexArray(0);
-
-        // // now bind back to default framebuffer and draw a quad plane with the attached framebuffer color texture
-        // glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        // glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
-        // // clear all relevant buffers
-        // glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // set clear color to white (not really necessary actually, since we won't be able to see behind the quad anyways)
-        // glClear(GL_COLOR_BUFFER_BIT);
-        // // render blur end ----------------------------------------------------------------------------------------------
 
 
         // render color enhance begin --------------------------------------------------------------------------------------------
@@ -1216,34 +1449,6 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
         // render color enhance end ----------------------------------------------------------------------------------------------
 
-        // // render blur begin --------------------------------------------------------------------------------------------
-        // // bind to framebuffer and draw scene as we normally would to color texture 
-        // glBindFramebuffer(GL_FRAMEBUFFER, blurBuffer);
-        // glEnable(GL_DEPTH_TEST); // enable depth testing (is disabled for rendering screen-space quad)
-
-        // // make sure we clear the framebuffer's content
-        // glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        // // render container
-        // blurShader.use();
-        // {
-        //     blurShader.setInt("inTexture", 0);
-        // }
-        // glBindVertexArray(VAO);
-        // glActiveTexture(GL_TEXTURE0);
-        // glBindTexture(GL_TEXTURE_2D, colorEnhanceTexture);
-        // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        // glBindVertexArray(0);
-
-        // // now bind back to default framebuffer and draw a quad plane with the attached framebuffer color texture
-        // glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        // glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
-        // // clear all relevant buffers
-        // glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // set clear color to white (not really necessary actually, since we won't be able to see behind the quad anyways)
-        // glClear(GL_COLOR_BUFFER_BIT);
-        // // render blur end ----------------------------------------------------------------------------------------------
-
         // render displacement mapping begin --------------------------------------------------------------------------------------------
         // bind to framebuffer and draw scene as we normally would to color texture 
         glBindFramebuffer(GL_FRAMEBUFFER, displacementbuffer2);
@@ -1258,7 +1463,7 @@ int main()
         {
             diplacementMappingShader2.setInt("noiseTexture", 0);
             diplacementMappingShader2.setInt("circleTexture", 1);
-            diplacementMappingShader2.setFloat("time", time / 40.0);
+            diplacementMappingShader2.setFloat("time", time / 20.0);
         }
         glBindVertexArray(VAO);
         glActiveTexture(GL_TEXTURE0);

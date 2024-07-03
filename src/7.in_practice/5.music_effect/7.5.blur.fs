@@ -11,11 +11,11 @@ const float height = 800.0;
 const float PI = 3.141592653;
 
 const int blurRadius = 15;  // blur半径
-const vec2 blurOffset = vec2(1.0);  // blur步长
+const float blurOffset = 1.0;  // blur步长
 const float sumWeight = 0.996;
 
-// 边界值处理
-vec2 clampCoord(vec2 coord) {
+// 边界值处理 const char* extend = "hold"
+vec2 edgeCoord(vec2 coord) {
     return vec2(clamp(coord.x, 0.0, 1.0), clamp(coord.y, 0.0, 1.0));
 }
 
@@ -26,27 +26,40 @@ float getWeight(int i) {
 }
 
 // 高斯模糊效果
-vec3 GaussianBlur(sampler2D inTexture, vec2 coord) {
-    vec4 sourceColor = texture(inTexture, coord);
-    float weight = getWeight(0);
-    vec3 finalColor = sourceColor.rgb * weight;
+vec4 GaussianBlur(sampler2D inTexture, vec2 coord) {
+    vec4 finalColor = vec4(0.0);
+    finalColor += texture(inTexture, coord);
 
-    for (int i = 1; i < blurRadius; i++) {
-        weight = getWeight(i);
-        finalColor += texture(inTexture, clampCoord(coord - blurOffset * float(i))).rgb * weight;
-        finalColor += texture(inTexture, clampCoord(coord + blurOffset * float(i))).rgb * weight;
+    for (int i = 1; i <= blurRadius; i++) {
+        finalColor += texture(inTexture, edgeCoord(coord + vec2(float( i) / width, 0)));
+        finalColor += texture(inTexture, edgeCoord(coord + vec2(float(-i) / width, 0)));
     }
-    return finalColor;
+
+    for (int j = 1; j <= blurRadius; j++) {
+        finalColor += texture(inTexture, edgeCoord(coord + vec2(0, float( j) / height)));
+        finalColor += texture(inTexture, edgeCoord(coord + vec2(0, float(-j) / height)));
+    }
+
+    for (int i = 1; i <= blurRadius; i++) {
+        for (int j = 1; j <= blurRadius; j++) {
+            finalColor += texture(inTexture, edgeCoord(coord + vec2(float(i ) / width, float( j) / height)));
+            finalColor += texture(inTexture, edgeCoord(coord + vec2(float(-i) / width, float( j) / height)));
+            finalColor += texture(inTexture, edgeCoord(coord + vec2(float(i ) / width, float(-j) / height)));
+            finalColor += texture(inTexture, edgeCoord(coord + vec2(float(-i) / width, float(-j) / height)));
+        }
+    }
+
+    return finalColor / ((blurRadius * 2.0 + 1) * (blurRadius * 2.0 + 1));
 }
 
 // 
-vec3 CatmullRomBlur(vec2 coord) {
-    return vec3(0.0);
+vec4 CatmullRomBlur(vec2 coord) {
+    return vec4(0.0);
 }
 
 void main()
 {
-    // vec3 color = GaussianBlur(inTexture, TexCoord);
-    vec3 color = texture(inTexture, TexCoord).rgb;
-    gl_FragColor = vec4(color, 1.0);
+    vec4 color = GaussianBlur(inTexture, TexCoord);
+    // vec3 color = texture(inTexture, TexCoord).rgb;
+    gl_FragColor = vec4(color);
 } 
