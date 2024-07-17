@@ -173,6 +173,7 @@ set(7.in_practice
     #3.2d_game
     4.compute_shader
     5.music_effect
+    6.displace_mapping
 )
 
 set(GUEST_ARTICLES
