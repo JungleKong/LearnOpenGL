@@ -161,21 +161,21 @@ const float width = 800.0;
 const float height = 800.0;
 
 void main() {
-	// float grey = SimplexSum(st) * 0.5 + 0.5;  // [-1, 1] -> [0, 1]
+	float grey = SimplexSum(TexCoord) * 0.5 + 0.5;  // [-1, 1] -> [0, 1]
     
 	// float grey = SimplexSum(TexCoord);
     // grey = 1.0 / (1.0 + exp(grey * 5.0));
 
-    int range = 0;
-    float sum = 0.0;
-    for (int i = -range; i <= range; i++) {
-        for (int j = -range; j <= range; j++) {
-            vec2 st = TexCoord + vec2(float(i) / width, float(j) / height);
-            float noise = SimplexSum(st);
-            sum += 1.0 / (1.0 + exp(noise * 10.0));
-        }
-    }
-    float grey = sum / ((2 * range + 1) * (2 * range + 1));
+    // int range = 0;
+    // float sum = 0.0;
+    // for (int i = -range; i <= range; i++) {
+    //     for (int j = -range; j <= range; j++) {
+    //         vec2 st = TexCoord + vec2(float(i) / width, float(j) / height);
+    //         float noise = SimplexSum(st);
+    //         sum += 1.0 / (1.0 + exp(noise * 10.0));
+    //     }
+    // }
+    // float grey = sum / ((2 * range + 1) * (2 * range + 1));
 
     gl_FragColor = vec4(vec3(grey), 1.0);
 }

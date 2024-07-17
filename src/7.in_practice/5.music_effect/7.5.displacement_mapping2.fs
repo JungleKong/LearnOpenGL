@@ -50,8 +50,11 @@ vec3 getColor(float radius) {
             float t = 0.0;
             if(i != 5) {
                 t = (adjustedPos - pos[i]) / (pos[i + 1] - pos[i]);
+                resultColor = mix(color[i], color[(i + 1) % 6], t);
+            } else if (i == 5) {
+                t = (adjustedPos - pos[5]) / (1.0 - pos[5]);
+                resultColor = mix(color[5], color[(0) % 6], t);
             }
-            resultColor = mix(color[i], color[(i + 1) % 6], t);
             break;
         }
     }
@@ -60,9 +63,10 @@ vec3 getColor(float radius) {
 
 void main()
 {
-    vec2 displacement = texture(noiseTexture, TexCoord).rg;
-    displacement -= midpoint;
-    vec2 disCoord = TexCoord + displacement * displaceWeight * 2.0;
+    vec2 displacement = texture(noiseTexture, TexCoord).rr;
+    // displacement -= midpoint;
+    // vec2 disCoord = TexCoord + displacement * displaceWeight * 2.0;
+    vec2 disCoord = TexCoord + vec2(displacement.x - 0.5, displacement.y - 0.5) * 2.0;
     disCoord = clampCoord(disCoord);
     vec3 col = texture(circleTexture, disCoord).rgb;
 
@@ -74,11 +78,11 @@ void main()
 
     // mask
     // float blackLevel = clamp(grey, 0.16, 1.0);
-    float blackLevel = grey * step(0.16, grey);
-    float gammaGrey = pow(blackLevel, 0.83);
+    float blackLevel = grey * step(0.32, grey);
+    float gammaGrey = pow(blackLevel, 1.0 / 0.83);
 
 
-    float radius = getRadius(vec2(grey / 2.0, 0.0));
+    float radius = getRadius(vec2(grey, 0.0));
     vec3 rampCol = getColor(radius);
 
     vec3 outColor;
@@ -90,7 +94,7 @@ void main()
         outColor = 1.0 - 2.0 * (1.0 - gammaGrey) * (1.0 - rampCol);
     }
 
-    // gl_FragColor = vec4(getColor(getRadius(TexCoord)), 1.0);
+    gl_FragColor = vec4(getColor(getRadius(TexCoord)), 1.0);
 
     // noise color
     // gl_FragColor = vec4(texture(noiseTexture, TexCoord).rgb, 1.0);
@@ -105,7 +109,7 @@ void main()
     // gl_FragColor = vec4(differenceColor, 1.0);
 
     // overlay
-    // gl_FragColor = vec4(vec3(gammaGrey), 1.0);
+    // gl_FragColor = vec4(vec3(grey), 1.0);
 
 
     // rampCol
